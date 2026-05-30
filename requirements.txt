@@ -1,4 +1,5 @@
 streamlit
 scikit-learn
 matplotlib
+numpy==1.26.4
 shap==0.45.1
