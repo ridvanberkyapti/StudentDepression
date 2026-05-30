@@ -238,90 +238,53 @@ def build_sidebar(feature_cols: list, medians: dict) -> pd.DataFrame:
 # SHAP ANALYSIS — Explainable AI for the individual prediction
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# SHAP ANALYSIS — SADECE BU FONKSİYONU DEĞİŞTİRİYORUZ KANKA
+# ---------------------------------------------------------------------------
+
 def render_shap(model: GaussianNB, X_train: pd.DataFrame,
                 input_df: pd.DataFrame, feature_cols: list) -> None:
     """
-    Compute SHAP values for the given input vector using a KernelExplainer
-    (model-agnostic, works with any sklearn estimator) and render a
-    Waterfall plot showing per-feature contribution to P(Depression=1).
+    Bulut sunucusunu yormayan hızlı ve kararlı SHAP Explainer yapısı.
     """
     st.subheader("🔍 Explainable AI — SHAP Feature Contribution")
     st.markdown(
         "The chart below shows **which features push the Depression risk "
-        "up (red) or down (blue)** for the current student profile. "
-        "SHAP values are additive: their sum equals the log-odds shift "
-        "from the model's baseline probability."
+        "up (red) or down (blue)** for the current student profile."
     )
 
-    with st.spinner("Computing SHAP values… (first run may take ~20 s)"):
-
-        # Model wrapper: KernelExplainer needs a callable → probabilities
-        def predict_proba_depression(X: np.ndarray) -> np.ndarray:
-            """Return P(Depression=1) for an array of input rows."""
+    with st.spinner("Computing SHAP values instantly..."):
+        # Sunucuyu kilitlemeyen hızlı fonksiyon sarmalayıcısı
+        def predict_proba_depression_class1(X):
             df_tmp = pd.DataFrame(X, columns=feature_cols)
             return model.predict_proba(df_tmp)[:, 1]
 
-        # Use a small background sample for speed (100 rows from training set)
-        background = shap.sample(X_train, min(100, len(X_train)), random_state=42)
+        # KernelExplainer yerine sunucuda milisaniyeler içinde çalışan standart Explainer
+        background_summary = X_train.median().values.reshape(1, -1)
+        explainer = shap.Explainer(predict_proba_depression_class1, background_summary, feature_names=feature_cols)
+        shap_values = explainer(input_df)
 
-        explainer   = shap.KernelExplainer(predict_proba_depression, background)
-        shap_values = explainer.shap_values(input_df, nsamples=200)
-
-        # Build SHAP Explanation object for Waterfall plot
-        base_value = explainer.expected_value
-        sv_row     = shap_values[0] if shap_values.ndim == 2 else shap_values
-
-        explanation = shap.Explanation(
-            values      = sv_row,
-            base_values = base_value,
-            data        = input_df.values[0],
-            feature_names = feature_cols,
-        )
-
-    # ---- Waterfall plot -------------------------------------------------------
-    fig, ax = plt.subplots(figsize=(10, 6))
+    # ---- Bar Plot Görselleştirmesi ----
+    fig, ax = plt.subplots(figsize=(10, 5))
     fig.patch.set_facecolor("#0D1117")
     ax.set_facecolor("#161B22")
 
-    shap.waterfall_plot(explanation, max_display=12, show=False)
+    shap.plots.bar(shap_values[0], max_display=12, show=False)
 
-    # Style tweaks for readability inside Streamlit
+    # Streamlit koyu tema için yazı renklerini düzenleme
     for text_obj in fig.findobj(plt.Text):
         text_obj.set_color("#E6EDF3")
     for spine in ax.spines.values():
         spine.set_edgecolor("#21262D")
     ax.tick_params(colors="#8B949E")
-    ax.xaxis.label.set_color("#E6EDF3")
 
     plt.title(
-        "SHAP Waterfall — Feature Contributions to P(Depression | Profile)",
+        "SHAP Bar Plot — Feature Impact Contributions",
         color="#E6EDF3", fontsize=13, pad=12,
     )
     plt.tight_layout()
     st.pyplot(fig)
     plt.close(fig)
-
-    # ---- Bar plot (magnitude ranking) ----------------------------------------
-    st.markdown("**Feature Importance — Absolute SHAP Magnitudes**")
-    fig2, ax2 = plt.subplots(figsize=(9, 5))
-    fig2.patch.set_facecolor("#0D1117")
-    ax2.set_facecolor("#161B22")
-
-    shap.bar_plot(explanation, max_display=12, show=False)
-
-    for text_obj in fig2.findobj(plt.Text):
-        text_obj.set_color("#E6EDF3")
-    for spine in ax2.spines.values():
-        spine.set_edgecolor("#21262D")
-    ax2.tick_params(colors="#8B949E")
-
-    plt.title(
-        "SHAP Bar Plot — Absolute Feature Impact",
-        color="#E6EDF3", fontsize=13, pad=12,
-    )
-    plt.tight_layout()
-    st.pyplot(fig2)
-    plt.close(fig2)
 
 
 # ---------------------------------------------------------------------------
